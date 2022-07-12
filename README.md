@@ -8,3 +8,5 @@ This variant of the LocoRoco GPRS decrypting program searches the entire file fo
 Non GPRS sections are added to the final file, essentially skipping them.
 
 GPRS sections within GARC sections are skipped so as to preserve sizes and such, meaning those will have to be decrypted after being extracted from their parent GARC section.
+
+GPRS sections within GPRS sections aren't decrypted, so the resulting file will have to be decrypted a second time. This seems to only be the case for LocoRoco 2 and Midnight Carnival, specifically their DATA.BIN files.
