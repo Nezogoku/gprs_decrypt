@@ -2,7 +2,7 @@
 
 Didn't even notice some of the codes I was (re)writing had updates... or even existed.
 
-I replaced DecryptGPRS with a slightly rewritten version of bnnm's LZGPRS decompressor,
+I replaced DecryptGPRS with a slightly rewritten version of bnnm's LZGPRS decompressor (of which I came across in the LocoRoco Discord server),
 making the code SIGNIFICANTLY smaller.
 
 This variant of the LocoRoco GPRS decrypting program searches the entire file for a GPRS header and decrypts its contents.
