@@ -17,29 +17,17 @@ static ifstream in_file;
 static ofstream out_file;
 
 
-bool cmpBits(char data, int &shift) {
-    return (data >> shift--) & 0x01;
-}
-
-uint32_t setReverse(uint32_t tmpInt) {
-    uint32_t buffer = 0x00;
-    for (int b = 0; b < 4; ++b) {
-        buffer |= (tmpInt >> (0x00 + (8 * b))) & 0xFF;
-        if (b != 3) buffer <<= 8;
-    }
-    return buffer;
-}
-
-
 //Rewrite of bnnm's LZGPRS thing
 void DecryptGPRS(uint32_t &index, uint32_t dst_size) {
+    int shift, addr;
+    char buff, cur;
+    auto cmpBits = [&]() -> bool { return (cur >> shift--) & 0x01; };
+    
     //cout << "Decompressing" << endl;
-    char *dst = new char[dst_size];
+    char *dst = new char[dst_size] {};
     //cout << "Created temporary array with size " << dst_size << endl;
     uint32_t dst_curr = 0;
     //cout << "Set dst_curr to 0" << endl;
-    uint32_t dst_end = dst_curr + dst_size;
-    //cout << "Set dst_end to " << dst_end << endl;
     uint32_t dst_next = dst_curr;
     //cout << "Set dst_next to " << dst_next << endl;
     uint32_t src_curr = index + 0x08;
@@ -47,9 +35,7 @@ void DecryptGPRS(uint32_t &index, uint32_t dst_size) {
     uint32_t src_next = src_curr + 0x01;
     //cout << "Set src_next to " << src_next << endl;
 
-    int shift, addr;
-    char buff, cur;
-
+    
     in_file.seekg(src_curr++);
     //cout << "Seek to src_curr" << endl;
     in_file.get(cur);
@@ -69,7 +55,7 @@ void DecryptGPRS(uint32_t &index, uint32_t dst_size) {
             }
             else src_next = src_curr;
 
-            if (cmpBits(cur, shift)) break;
+            if (cmpBits()) break;
 
             //cout << "First loop raw byte" << endl;
             in_file.seekg(src_next);
@@ -88,7 +74,7 @@ void DecryptGPRS(uint32_t &index, uint32_t dst_size) {
         in_file.seekg(src_next);
         in_file.get(buff);
 
-        if (!cmpBits(cur, shift)) {
+        if (!cmpBits()) {
             //cout << "Unset addr" << endl;
             src_curr = src_next + 1;
 
@@ -108,28 +94,28 @@ void DecryptGPRS(uint32_t &index, uint32_t dst_size) {
                 in_file.get(cur);
                 shift = 7;
             }
-            nib_temp = cmpBits(cur, shift);
+            nib_temp = cmpBits();
 
             if (shift < 0) {
                 in_file.seekg(src_curr++);
                 in_file.get(cur);
                 shift = 7;
             }
-            nib_temp = (nib_temp << 1) | cmpBits(cur, shift);
+            nib_temp = (nib_temp << 1) | cmpBits();
 
             if (shift < 0) {
                in_file.seekg(src_curr++);
                 in_file.get(cur);
                 shift = 7;
             }
-            nib_temp = (nib_temp << 1) | cmpBits(cur, shift);
+            nib_temp = (nib_temp << 1) | cmpBits();
 
             if (shift < 0) {
                 in_file.seekg(src_curr++);
                 in_file.get(cur);
                 shift = 7;
             }
-            nib_temp = (nib_temp << 1) | cmpBits(cur, shift);
+            nib_temp = (nib_temp << 1) | cmpBits();
 
             addr = (0xFFFFFF00 | src_temp);
             addr = (addr << 4) | nib_temp;
@@ -145,7 +131,7 @@ void DecryptGPRS(uint32_t &index, uint32_t dst_size) {
                 shift = 7;
             }
 
-            if (!cmpBits(cur, shift)) break;
+            if (!cmpBits()) break;
 
             if (shift < 0) {
                 in_file.seekg(src_curr++);
@@ -154,7 +140,7 @@ void DecryptGPRS(uint32_t &index, uint32_t dst_size) {
             }
 
             //cout << "Count loop alter count" << endl;
-            count = count * 2 + ((cmpBits(cur, shift)) ? 1 : 0);
+            count = count * 2 + ((cmpBits()) ? 1 : 0);
         }
 
         if (count < 7) {
@@ -190,51 +176,61 @@ void DecryptGPRS(uint32_t &index, uint32_t dst_size) {
                 if (add) add = 0;
             }
         }
-    } while (in_file.get(buff) && dst_curr < dst_end);
+    } while (in_file.get(buff) && dst_curr < dst_size);
     //cout << "Stop decompressing" << endl;
 
-    out_file.write((const char*)(dst), dst_end);
+    out_file.write((const char*)(dst), dst_size);
     //cout << "Copied decompressed to outfile" << endl;
 
     index = src_next;
 }
 
 void SkipGARC(uint32_t &index) {
-    uint32_t cfileAddr;                                                         // 32 bit le, FILE chunk location
-    uint32_t cnameAddr;                                                         // 32 bit le, NAME chunk location
-    uint32_t cdataAddr;                                                         // 32 bit le, DATA chunk location
-    uint32_t termAddr;                                                          // 32 bit le, TERM location
-
-    uint32_t tempAddr = 0x14;
-
-    in_file.seekg(index + tempAddr);
-    in_file.read((char*)(&cfileAddr), sizeof(uint32_t));
-
-    tempAddr = cfileAddr + 0x04;
-    in_file.seekg(index + tempAddr);
-    in_file.read((char*)(&cnameAddr), sizeof(uint32_t));
-
-    tempAddr = cnameAddr + 0x04;
-    in_file.seekg(index + tempAddr);
-    in_file.read((char*)(&cdataAddr), sizeof(uint32_t));
-
-    tempAddr = cdataAddr + 0x04;
-    in_file.seekg(index + tempAddr);
-    in_file.read((char*)(&termAddr), sizeof(uint32_t));
-
     in_file.seekg(index);
-    for (int i = 0; i < (termAddr + 0x04); ++i) {
-        char buff;
-        in_file.get(buff);
-        out_file.put(buff);
-    }
+    auto *in_dat = in_file.rdbuf();
+    uint32_t tmp = 0x08;
+    
+    //Get SUB-HEADER chunk location
+    in_file.seekg(index + tmp);
+    in_file.read((char*)(&tmp), sizeof(uint32_t));
+    
+    //Get FILE chunk location
+    in_file.seekg(index + (tmp + 0x04));
+    in_file.read((char*)(&tmp), sizeof(uint32_t));
 
-    index += (termAddr + 0x04);
+    //Get NAME chunk location
+    in_file.seekg(index + (tmp + 0x04));
+    in_file.read((char*)(&tmp), sizeof(uint32_t));
+
+    //Get DATA chunk location
+    in_file.seekg(index + (tmp + 0x04));
+    in_file.read((char*)(&tmp), sizeof(uint32_t));
+
+    //Get TERM location
+    in_file.seekg(index + (tmp + 0x04));
+    in_file.read((char*)(&tmp), sizeof(uint32_t));
+
+    char *dst = new char[tmp + 0x04] {};
+    in_dat->sgetn(dst, tmp + 0x04);
+    out_file.write((const char*)(dst), tmp + 0x04);
+
+    index += (tmp + 0x04);
 }
 
 void searchGPRS(string filename) {
-    const uint32_t GPRS = 0x47505253;
-    const uint32_t GARC = 0x47415243;
+    const uint32_t GPRS = 0x47505253, GARC = 0x47415243;
+    uint32_t index = 0x00, chunk = 0x00;
+    int num_gprs = 0;
+    char buff;
+    auto getBE32 = [&]() -> uint32_t {
+        chunk = 0x00;
+        for (int c = 0; c < 4; ++c) {
+            in_file.get(buff);
+            chunk = (chunk << 8) | (buff & 0xFF);
+        }
+        return chunk;
+    };
+
 
     in_file.open(filename.c_str(), ios::in | ios::binary);
     if (!in_file.is_open()) {
@@ -244,12 +240,6 @@ void searchGPRS(string filename) {
     else cout << filename.substr(filename.find_last_of("\\/") + 1)
               << " opened for decompressing" << endl;
 
-    char buff;
-    int num_gprs = 0;
-    uint32_t index = 0x00;
-    uint32_t decomp_size;
-    uint32_t chunk;
-
     out_file.open((filename + ".dec").c_str(), ios::out | ios::app | ios::binary);
     if (!out_file.is_open()) {
         cerr << "Unable to write to \"" << (filename + ".dec") << "\"" << endl;
@@ -258,32 +248,36 @@ void searchGPRS(string filename) {
     }
     else cout << filename.substr(filename.find_last_of("\\/") + 1) + ".dec"
               << " opened for writing" << endl;
-
+    
+    
     while (in_file.get(buff)) {
         in_file.seekg(index);
-        in_file.read((char*)(&chunk), sizeof(uint32_t));
+        chunk = getBE32();
 
-        if (setReverse(chunk) == GARC) SkipGARC(index);
-        else if (setReverse(chunk) == GPRS) {
+        if (chunk == GARC) SkipGARC(index);
+        else if (chunk == GPRS) {
             num_gprs += 1;
 
             //Grabs size of decompressed section from GPRS header thing
-            in_file.seekg(index + 0x04);
-            in_file.read((char*)(&decomp_size), sizeof(uint32_t));
-            decomp_size = setReverse(decomp_size);
+            chunk = getBE32();
 
             //cout << "Current index is " << index << endl;
             uint32_t index_curr = index;
-            DecryptGPRS(index, decomp_size);
+            DecryptGPRS(index, chunk);
+            
             cout << "Decompressed the section at offset 0x" << std::hex << index_curr << std::dec << endl;
             cout << "           Size of compressed section: " << (index - index_curr) / 1024 << "kB" << endl;
-            cout << "           Size of decompressed section: " << decomp_size / 1024 << "kB" << endl;
+            cout << "           Size of decompressed section: " << chunk / 1024 << "kB" << endl;
         }
         else {
-            buff = setReverse(chunk) >> 24;
-            out_file.put(buff);
-            index += 0x01;
+            for (int c = 0; c < 4; ++c, ++index) {
+                buff = (chunk >> (8 * (3 - c))) & 0xFF;
+                out_file.put(buff);
+            }
         }
+        
+        //Ensures index is multiple of 4
+        index += (!index) ? 0x04 : (0x04 - (index % 0x04)) % 0x04;
     }
 
     in_file.close();
