@@ -1,8 +1,8 @@
 #include <algorithm>
 #include <iostream>
 #include <fstream>
-#include <cstdio>
 #include <string>
+#include "printpause.hpp"
 
 
 using std::cout;
@@ -268,6 +268,13 @@ void searchGPRS(string filename) {
             cout << "Decompressed the section at offset 0x" << std::hex << index_curr << std::dec << endl;
             cout << "           Size of compressed section: " << (index - index_curr) / 1024 << "kB" << endl;
             cout << "           Size of decompressed section: " << chunk / 1024 << "kB" << endl;
+            
+            //Ensures index is multiple of 4
+            while (index % 0x04) {
+                in_file.get(buff);
+                out_file.put(buff);
+                index += 1;
+            }
         }
         else {
             for (int c = 0; c < 4; ++c, ++index) {
@@ -275,9 +282,6 @@ void searchGPRS(string filename) {
                 out_file.put(buff);
             }
         }
-        
-        //Ensures index is multiple of 4
-        index += (!index) ? 0x04 : (0x04 - (index % 0x04)) % 0x04;
     }
 
     in_file.close();
@@ -307,6 +311,8 @@ int main(int argc, char *argv[]) {
             cout << endl;
         }
     }
+    
+    sleep(10);
 
     return 0;
 }
